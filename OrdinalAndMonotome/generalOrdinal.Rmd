@@ -1,0 +1,318 @@
+---
+title: "generalordinal"
+author: "jaume cloquell capo"
+date: "6 de febrero de 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+#library(rjava)
+library(RWeka)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Clasificación ordinal
+
+## Lectura del dataset 
+
+El primer paso es leer los datos, al ser un fichero **arff** usaremos la funcion read.arff de Rweka.
+
+```{r}
+original <- read.arff("esl.arff")
+#original <- read.arff("era.arff")
+#original <- read.arff("lev.arff")
+#original <- read.arff("swd.arff")
+dt <- original
+summary(dt)
+head(dt)
+```
+
+## Descomposición del problema
+
+Para poder aplicar los modelos múltiples de clasificación ordinal tendremos que descomponer el problema en el caso de nuestro problema con 9 clases, tendremos que crear 8 dataframes. La idea de no usar el 9º dataset es que al ir calculando las probabilidades en cascada, si llegamos al 8 y no hemos clasificado correctamente implicará que estamos ante un ejemplo de la última por eliminación. 
+
+```{r}
+clases=as.integer(unique(dt$out1))
+sort(clases)
+```
+
+Seleccionaremos los índices de éstas:
+```{r}
+indices<-which(dt$out1==clases[1])
+indices
+```
+
+Guardamos la variable clase en un vector auxiliar
+
+```{r}
+y = as.integer(dt$out1)
+y
+```
+
+
+Cambiamos los valores de estas clases a 0 y el resto a 1
+```{r}
+y[indices]<-0
+y = ifelse(y==0,0,1)
+```
+
+Con esto ya tenemos casi listo el primer data frame derivado, nos queda por juntar el resto del dataset con la
+nueva clase binaria. Más adelante se procederá a clasificar dicho conjunto de datos , por lo que es conveniente
+pasar la variable a factor
+
+```{r}
+data1 = cbind(dt[,1:4],target1=as.factor(y))
+sapply(data1,class)
+head(data1)
+```
+
+Rocederemos a repetir los pasos anteriores, teniendo en cuenta las clases ya convertidas en el paso anterior, por lo que las añadiremos al vector de índices previamente creado.
+
+
+```{r}
+indices<-c(indices,which(dt$out1==clases[2]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data2 <- cbind(dt[,1:4],target2=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[3]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data3 <- cbind(dt[,1:4],target3=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[4]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data4 <- cbind(dt[,1:4],target4=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[5]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data5 <- cbind(dt[,1:4],target5=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[6]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data6 <- cbind(dt[,1:4],target6=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[7]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data7 <- cbind(dt[,1:4],target7=as.factor(y))
+
+indices<-c(indices,which(dt$out1==clases[8]))
+y = as.integer(dt$out1)
+y[indices]=0
+y = ifelse(y==0,0,1)
+data8 <- cbind(dt[,1:4],target8=as.factor(y))
+```
+
+
+### Clasificación
+
+Creamos un modelo para cada uno de nuestros subproblemas binarios. 
+
+```{r}
+library(RWeka)
+m1 <- J48(target1 ~ ., data = data1)
+m2 <- J48(target2 ~ ., data = data2)
+m3 <- J48(target3 ~ ., data = data3)
+m4 <- J48(target4 ~ ., data = data4)
+m5 <- J48(target5 ~ ., data = data5)
+m6 <- J48(target6 ~ ., data = data6)
+m7 <- J48(target7 ~ ., data = data7)
+m8 <- J48(target8 ~ ., data = data8)
+```
+
+Podemos hacer un estudio más detallado de los modelos , haciendo uso de la siguiente función
+
+```{r}
+eval_m1 <- evaluate_Weka_classifier(m1, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m2 <- evaluate_Weka_classifier(m2, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m3 <- evaluate_Weka_classifier(m3, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m4 <- evaluate_Weka_classifier(m4, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m5 <- evaluate_Weka_classifier(m5, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m6 <- evaluate_Weka_classifier(m6, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m7 <- evaluate_Weka_classifier(m7, numFolds = 10, complexity = FALSE, class = TRUE)
+eval_m8 <- evaluate_Weka_classifier(m8, numFolds = 10, complexity = FALSE, class = TRUE)
+```
+
+```{r}
+eval_m1
+eval_m2
+eval_m3
+eval_m4
+eval_m5
+eval_m6
+eval_m7
+eval_m8
+```
+
+
+Necesitamos conocer las probabilidades generadas por nuestros modelos, para ello probaremos a predecir la instancia numero 108 de nuestro dataset, sabiendo de por si que pertenece a la clase 9. La clase con máxima probabilidad se asigna a la instancia. Es decir en este caso es prop9
+
+```{r}
+pred1<-predict(m1,dt[108,1:4],type="probability")
+prop1 <- 1 - pred1[1]
+pred2<-predict(m2,dt[108,1:4],type="probability")
+prop2 <- (1 - pred1[1] ) * pred2[1]
+pred3<-predict(m3,dt[108,1:4],type="probability")
+prop3 <- (1 - pred2[1] ) * pred3[1]
+pred4<-predict(m4,dt[108,1:4],type="probability")
+prop4 <- (1 - pred3[1] ) * pred4[1]
+pred5<-predict(m5,dt[108,1:4],type="probability")
+prop5 <- (1 - pred4[1] ) * pred5[1]
+pred6<-predict(m6,dt[108,1:4],type="probability")
+prop6 <- (1 - pred5[1] ) * pred6[1]
+pred7<-predict(m7,dt[108,1:4],type="probability")
+prop7 <- (1 - pred6[1] ) * pred7[1]
+pred8<-predict(m8,dt[108,1:4],type="probability")
+prop8 <- (1 - pred7[1] ) * pred8[1]
+prop9 <-  pred8[1]
+prop1
+prop2
+prop3
+prop4
+prop5
+prop6
+prop7
+prop8
+prop9
+```
+
+Una vez tengamos este resultado, debemos agregar los resultados para obtener la clasificación de nuestro modelo para el conjunto de test. Esto lo haremos todo en una función que generalice el modelo y realice todo el calculo de manera que nos ofrezca como salida un vector con las clase predicha.  
+
+## Generalización del proceso de modelos múltiples
+```{r}
+rm(list=ls())
+library(xgboost)
+library(Matrix)
+library(caret)
+library(RWeka)
+library(data.table)
+library(caTools) 
+library(dplyr) 
+
+library(randomForest)
+library(caTools)
+
+esl <- read.arff("esl.arff")
+era <- read.arff("era.arff")
+lev <- read.arff("lev.arff")
+swd <- read.arff("swd.arff")
+
+#'@function createTraintAndTestPartition 
+#'@description General las particiones de test y train 
+#'
+#'@param dataset Dataset original
+#'@param SplitRatio Porcentaje de valores en train y test
+#'@return Una lista con las dos particiones
+createTraintAndTestPartition <- function (dataset, SplitRatio = 0.75) {
+  set.seed(123)
+  dt <- list()
+  sample = sample.split(dataset,SplitRatio = SplitRatio)
+  dt[["train"]] = subset(dataset,sample ==TRUE)
+  dt[["test"]] = subset(dataset, sample==FALSE)
+  return (dt)
+}
+
+#'@function probCalc 
+#'
+#'@param prop Resultados probabilísticos de los modelos
+#'@param clases Número de clases que contiebe la variable de salida
+#'@return Predicciones
+probCalc <- function (prob, clases) {
+  salida<-prob
+  for(i in 2:(length(clases))) {
+    salida[,i]<-prob[,(i-1)]*(1-prob[,i])
+    salida[,1]<-(1-prob[,1])
+    salida[,length(clases)]<-prob[,(length(clases)-1)]
+  }
+  return (salida)
+}
+
+#'@function transformToBinary
+#'@description Modificacion del datatset con valores binarios en la columna de salida por cada clase
+#'
+#'@param data data.frame de entrada
+#'@param clase clase de la variable de salida
+#'@return Dataset modificado
+transformToBinary <- function(data, clase){
+   num.column <- ncol(data)
+   
+  #creamos el dataset intermedio cambiando las clases en funcion del orden
+  data[,num.column] <- ifelse(data[,num.column] > clase, 1, 0) 
+  data[,num.column] <- as.factor(data[,num.column])
+  # Para cada conjunto de datos aprendemos un modelo
+  colnames(data)[num.column] <- "target"
+  return (data)
+}
+
+#'@function makePrediction
+#'@description Generao un modelo en base al nombre pasado por parámetro y general la predicción
+#'
+#'@param clasificador Nombre del tipo de clasificador
+#'@param trainData Dataset de train para generar el modelo
+#'@param testData Dataset de test para hacer la prediccion
+makePrediction <- function (clasificador, trainData, testData) {
+  if (clasificador == "J48") {
+    model <- J48(target~ ., data = trainData)
+    return(predict(model, testData, type = "prob"))
+  } else if (clasificador == "randomForest") {
+    model <- randomForest(target~ ., data = trainData) 
+    return(predict(model, testData, type = "prob"))
+  } else  {
+    stop("Invalid clasificador")
+  }
+}
+
+#'@function ordinalClassification
+#'@description Aplicación de un modelo de clasificación de manera ordinal
+#'
+#'@param data data.frame de entrada. Se espera la variable de salida en la última columna
+#'@return Lista de modelos. 
+ordinalClassification <- function (dataset, clasificador = "J48") {
+  if(is.null(dataset)) stop("null dataset values not allowed")
+  
+  num.column <- ncol(dataset)
+  
+  data <- createTraintAndTestPartition(dataset)
+  testData <- data[["test"]]
+  trainData <- data[["train"]]
+  
+  #Obtenemos el número de clase del problema:
+  clases<-as.integer(unique(dataset[,num.column]))
+  
+  #Creamos un vector del tamaño de test para contener las probabilidades
+  prob <- 1:length(testData[,2])
+  
+  #Para cada clase menos la última
+  for(i in 1:(length(clases)-1))
+  {
+    binaryTrainData <- transformToBinary(trainData, i)
+    
+    pred <- makePrediction(clasificador, binaryTrainData, testData)
+ 
+    prob<-cbind(prob,as.data.frame(pred)$`1`)
+  }
+  
+  salida <- probCalc(prob, clases)
+  
+  #Nos quedamos con el indice de la columna que tiene el mayor elemento
+  pred = apply(salida[,-1],1,which.max)
+  acc = sum(pred==testData[,num.column])/length(testData[,num.column])
+  return(list("prediction" = pred, "accuracy" = acc))
+}
+
+pred <- ordinalClassification(esl, clasificador = "J48")
+pred[["accuracy"]]
+pred <- ordinalClassification(era, clasificador = "randomForest")
+pred[["accuracy"]]
+```
+
